@@ -1132,13 +1132,17 @@ func (s *SuperAgent) EndBytes(callback ...func(response Response, body []byte, e
 
 	for {
 		resp, body, errs = s.getResponseBytes()
+		if s.isRetryableRequest(resp, errs) {
+			// retry
+			continue
+		}
+		if s.Retryable.Attempt > 0 && resp != nil {
+			resp.Header.Set("Retry-Count", strconv.Itoa(s.Retryable.Attempt))
+		}
 		if errs != nil {
 			return nil, nil, errs
 		}
-		if s.isRetryableRequest(resp) {
-			resp.Header.Set("Retry-Count", strconv.Itoa(s.Retryable.Attempt))
-			break
-		}
+		break
 	}
 
 	respCallback := *resp
@@ -1148,13 +1152,25 @@ func (s *SuperAgent) EndBytes(callback ...func(response Response, body []byte, e
 	return resp, body, nil
 }
 
-func (s *SuperAgent) isRetryableRequest(resp Response) bool {
-	if s.Retryable.Enable && s.Retryable.Attempt < s.Retryable.RetryerCount && contains(resp.StatusCode, s.Retryable.RetryableStatus) {
-		time.Sleep(s.Retryable.RetryerTime)
-		s.Retryable.Attempt++
+func (s *SuperAgent) isRetryableRequest(resp Response, errs []error) bool {
+	if !s.Retryable.Enable || s.Retryable.Attempt >= s.Retryable.RetryerCount {
 		return false
 	}
-	return true
+	if len(errs) > 0 {
+		if urlErr, ok := errs[0].(*url.Error); ok {
+			if urlErr.Temporary() {
+				time.Sleep(s.Retryable.RetryerTime)
+				s.Retryable.Attempt++
+				return true
+			}
+		}
+	}
+	if resp != nil && contains(resp.StatusCode, s.Retryable.RetryableStatus) {
+		time.Sleep(s.Retryable.RetryerTime)
+		s.Retryable.Attempt++
+		return true
+	}
+	return false
 }
 
 func contains(respStatus int, statuses []int) bool {
@@ -1457,7 +1473,7 @@ func (s *SuperAgent) AsCurlCommand() (string, error) {
 }
 
 // set the transport in a chainable way
-func (s *SuperAgent) SetTransport(t *http.Transport) (*SuperAgent) {
+func (s *SuperAgent) SetTransport(t *http.Transport) *SuperAgent {
 	s.Transport = t
 	return s
 }
