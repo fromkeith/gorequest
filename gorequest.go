@@ -1132,7 +1132,7 @@ func (s *SuperAgent) EndBytes(callback ...func(response Response, body []byte, e
 
 	for {
 		resp, body, errs = s.getResponseBytes()
-		if s.isRetryableRequest(resp, errs) {
+		if s.isRetryableRequest(resp) {
 			// retry
 			continue
 		}
@@ -1152,13 +1152,15 @@ func (s *SuperAgent) EndBytes(callback ...func(response Response, body []byte, e
 	return resp, body, nil
 }
 
-func (s *SuperAgent) isRetryableRequest(resp Response, errs []error) bool {
+func (s *SuperAgent) isRetryableRequest(resp Response) bool {
 	if !s.Retryable.Enable || s.Retryable.Attempt >= s.Retryable.RetryerCount {
 		return false
 	}
-	if len(errs) > 0 {
-		if urlErr, ok := errs[0].(*url.Error); ok {
+	if len(s.Errors) == 1 {
+		if urlErr, ok := s.Errors[0].(*url.Error); ok {
 			if urlErr.Temporary() {
+				// reset so we don't auto fail next time
+				s.Errors = s.Errors[:0]
 				time.Sleep(s.Retryable.RetryerTime)
 				s.Retryable.Attempt++
 				return true
