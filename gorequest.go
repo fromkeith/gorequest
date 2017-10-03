@@ -1455,3 +1455,9 @@ func (s *SuperAgent) AsCurlCommand() (string, error) {
 	}
 	return cmd.String(), nil
 }
+
+// set the transport in a chainable way
+func (s *SuperAgent) SetTransport(t *http.Transport) (*SuperAgent) {
+	s.Transport = t
+	return s
+}
