@@ -24,7 +24,7 @@ func (s *SuperAgent) safeModifyHttpClient() {
 }
 
 // I'm not sure how this func will work with Clone.
-func (s *SuperAgent) Timeout(timeout time.Duration) *SuperAgent {
+func (s *SuperAgent) Timeout(timeout time.Duration) GoRequestAgent {
     s.Transport.Dial = func(network, addr string) (net.Conn, error) {
         conn, err := net.DialTimeout(network, addr, timeout)
         if err != nil {

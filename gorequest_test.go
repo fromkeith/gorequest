@@ -210,7 +210,7 @@ func TestMakeRequest(t *testing.T) {
 	var err error
 	var cases = []struct {
 		m string
-		s *SuperAgent
+		s GoRequestAgent
 	}{
 		{POST, New().Post("/")},
 		{GET, New().Get("/")},
@@ -2130,7 +2130,7 @@ func TestCookies(t *testing.T) {
 		return
 	}
 	domain, _ := url.Parse("https://github.com")
-	if len(request.Client.Jar.Cookies(domain)) == 0 {
+	if len(request.GetClient().Jar.Cookies(domain)) == 0 {
 		t.Error("Expected cookies | but get nothing")
 	}
 }

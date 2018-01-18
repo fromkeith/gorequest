@@ -66,6 +66,49 @@ type superAgentRetryable struct {
 	Enable          bool
 }
 
+// The interface for SuperAgent
+type GoRequestAgent interface {
+	Clone() GoRequestAgent
+	SetDebug(enable bool) GoRequestAgent
+	SetCurlCommand(enable bool) GoRequestAgent
+	SetDoNotClearSuperAgent(enable bool) GoRequestAgent
+	SetLogger(logger Logger) GoRequestAgent
+	ClearSuperAgent()
+	CustomMethod(method, targetUrl string) GoRequestAgent
+	Get(targetUrl string) GoRequestAgent
+	Post(targetUrl string) GoRequestAgent
+	Head(targetUrl string) GoRequestAgent
+	Put(targetUrl string) GoRequestAgent
+	Delete(targetUrl string) GoRequestAgent
+	Patch(targetUrl string) GoRequestAgent
+	Options(targetUrl string) GoRequestAgent
+	Set(param string, value string) GoRequestAgent
+	AppendHeader(param string, value string) GoRequestAgent
+	Retry(retryerCount int, retryerTime time.Duration, statusCode ...int) GoRequestAgent
+	SetBasicAuth(username string, password string) GoRequestAgent
+	AddCookie(c *http.Cookie) GoRequestAgent
+	AddCookies(cookies []*http.Cookie) GoRequestAgent
+	Type(typeStr string) GoRequestAgent
+	Query(content interface{}) GoRequestAgent
+	Param(key string, value string) GoRequestAgent
+	TLSClientConfig(config *tls.Config) GoRequestAgent
+	Proxy(proxyUrl string) GoRequestAgent
+	RedirectPolicy(policy func(req Request, via []Request) error) GoRequestAgent
+	Send(content interface{}) GoRequestAgent
+	SendSlice(content []interface{}) GoRequestAgent
+	SendMap(content interface{}) GoRequestAgent
+	SendStruct(content interface{}) GoRequestAgent
+	SendString(content string) GoRequestAgent
+	SendFile(file interface{}, args ...string) GoRequestAgent
+	End(callback ...func(response Response, body string, errs []error)) (Response, string, []error)
+	EndBytes(callback ...func(response Response, body []byte, errs []error)) (Response, []byte, []error)
+	EndStruct(v interface{}, callback ...func(response Response, v interface{}, body []byte, errs []error)) (Response, []byte, []error)
+	MakeRequest() (*http.Request, error)
+	AsCurlCommand() (string, error)
+	Timeout(timeout time.Duration) GoRequestAgent
+	GetClient() *http.Client
+}
+
 // A SuperAgent is a object storing all request data for client.
 type SuperAgent struct {
 	Url                  string
@@ -96,7 +139,7 @@ type SuperAgent struct {
 var DisableTransportSwap = false
 
 // Used to create a new SuperAgent object.
-func New() *SuperAgent {
+func New() GoRequestAgent {
 	cookiejarOptions := cookiejar.Options{
 		PublicSuffixList: publicsuffix.List,
 	}
@@ -209,7 +252,7 @@ func copyRetryable(old superAgentRetryable) superAgentRetryable {
 // that the base request set your timeout and redirect polices, and no modification of
 // the client or transport happen after cloning.
 // Note: DoNotClearSuperAgent is forced to "true" after Clone
-func (s *SuperAgent) Clone() *SuperAgent {
+func (s *SuperAgent) Clone() GoRequestAgent {
 	clone := &SuperAgent{
 		Url:                  s.Url,
 		Method:               s.Method,
@@ -239,24 +282,29 @@ func (s *SuperAgent) Clone() *SuperAgent {
 }
 
 // Enable the debug mode which logs request/response detail
-func (s *SuperAgent) SetDebug(enable bool) *SuperAgent {
+func (s *SuperAgent) SetDebug(enable bool) GoRequestAgent {
 	s.Debug = enable
 	return s
 }
 
+
+func (s *SuperAgent) GetClient() *http.Client {
+	return s.Client
+}
+
 // Enable the curlcommand mode which display a CURL command line
-func (s *SuperAgent) SetCurlCommand(enable bool) *SuperAgent {
+func (s *SuperAgent) SetCurlCommand(enable bool) GoRequestAgent {
 	s.CurlCommand = enable
 	return s
 }
 
 // Enable the DoNotClear mode for not clearing super agent and reuse for the next request
-func (s *SuperAgent) SetDoNotClearSuperAgent(enable bool) *SuperAgent {
+func (s *SuperAgent) SetDoNotClearSuperAgent(enable bool) GoRequestAgent {
 	s.DoNotClearSuperAgent = enable
 	return s
 }
 
-func (s *SuperAgent) SetLogger(logger Logger) *SuperAgent {
+func (s *SuperAgent) SetLogger(logger Logger) GoRequestAgent {
 	s.logger = logger
 	return s
 }
@@ -283,7 +331,7 @@ func (s *SuperAgent) ClearSuperAgent() {
 }
 
 // Just a wrapper to initialize SuperAgent instance by method string
-func (s *SuperAgent) CustomMethod(method, targetUrl string) *SuperAgent {
+func (s *SuperAgent) CustomMethod(method, targetUrl string) GoRequestAgent {
 	switch method {
 	case POST:
 		return s.Post(targetUrl)
@@ -308,7 +356,7 @@ func (s *SuperAgent) CustomMethod(method, targetUrl string) *SuperAgent {
 	}
 }
 
-func (s *SuperAgent) Get(targetUrl string) *SuperAgent {
+func (s *SuperAgent) Get(targetUrl string) GoRequestAgent {
 	s.ClearSuperAgent()
 	s.Method = GET
 	s.Url = targetUrl
@@ -316,7 +364,7 @@ func (s *SuperAgent) Get(targetUrl string) *SuperAgent {
 	return s
 }
 
-func (s *SuperAgent) Post(targetUrl string) *SuperAgent {
+func (s *SuperAgent) Post(targetUrl string) GoRequestAgent {
 	s.ClearSuperAgent()
 	s.Method = POST
 	s.Url = targetUrl
@@ -324,7 +372,7 @@ func (s *SuperAgent) Post(targetUrl string) *SuperAgent {
 	return s
 }
 
-func (s *SuperAgent) Head(targetUrl string) *SuperAgent {
+func (s *SuperAgent) Head(targetUrl string) GoRequestAgent {
 	s.ClearSuperAgent()
 	s.Method = HEAD
 	s.Url = targetUrl
@@ -332,7 +380,7 @@ func (s *SuperAgent) Head(targetUrl string) *SuperAgent {
 	return s
 }
 
-func (s *SuperAgent) Put(targetUrl string) *SuperAgent {
+func (s *SuperAgent) Put(targetUrl string) GoRequestAgent {
 	s.ClearSuperAgent()
 	s.Method = PUT
 	s.Url = targetUrl
@@ -340,7 +388,7 @@ func (s *SuperAgent) Put(targetUrl string) *SuperAgent {
 	return s
 }
 
-func (s *SuperAgent) Delete(targetUrl string) *SuperAgent {
+func (s *SuperAgent) Delete(targetUrl string) GoRequestAgent {
 	s.ClearSuperAgent()
 	s.Method = DELETE
 	s.Url = targetUrl
@@ -348,7 +396,7 @@ func (s *SuperAgent) Delete(targetUrl string) *SuperAgent {
 	return s
 }
 
-func (s *SuperAgent) Patch(targetUrl string) *SuperAgent {
+func (s *SuperAgent) Patch(targetUrl string) GoRequestAgent {
 	s.ClearSuperAgent()
 	s.Method = PATCH
 	s.Url = targetUrl
@@ -356,7 +404,7 @@ func (s *SuperAgent) Patch(targetUrl string) *SuperAgent {
 	return s
 }
 
-func (s *SuperAgent) Options(targetUrl string) *SuperAgent {
+func (s *SuperAgent) Options(targetUrl string) GoRequestAgent {
 	s.ClearSuperAgent()
 	s.Method = OPTIONS
 	s.Url = targetUrl
@@ -372,7 +420,7 @@ func (s *SuperAgent) Options(targetUrl string) *SuperAgent {
 //      Post("/gamelist").
 //      Set("Accept", "application/json").
 //      End()
-func (s *SuperAgent) Set(param string, value string) *SuperAgent {
+func (s *SuperAgent) Set(param string, value string) GoRequestAgent {
 	s.Header.Set(param, value)
 	return s
 }
@@ -385,7 +433,7 @@ func (s *SuperAgent) Set(param string, value string) *SuperAgent {
 //      AppendHeader("Accept", "application/json").
 //      AppendHeader("Accept", "text/plain").
 //      End()
-func (s *SuperAgent) AppendHeader(param string, value string) *SuperAgent {
+func (s *SuperAgent) AppendHeader(param string, value string) GoRequestAgent {
 	s.Header.Add(param, value)
 	return s
 }
@@ -399,7 +447,7 @@ func (s *SuperAgent) AppendHeader(param string, value string) *SuperAgent {
 //      Post("/gamelist").
 //      Retry(3, 5 * time.seconds, http.StatusBadRequest, http.StatusInternalServerError).
 //      End()
-func (s *SuperAgent) Retry(retryerCount int, retryerTime time.Duration, statusCode ...int) *SuperAgent {
+func (s *SuperAgent) Retry(retryerCount int, retryerTime time.Duration, statusCode ...int) GoRequestAgent {
 	for _, code := range statusCode {
 		statusText := http.StatusText(code)
 		if len(statusText) == 0 {
@@ -430,19 +478,19 @@ func (s *SuperAgent) Retry(retryerCount int, retryerTime time.Duration, statusCo
 //      Post("/gamelist").
 //      SetBasicAuth("myuser", "mypass").
 //      End()
-func (s *SuperAgent) SetBasicAuth(username string, password string) *SuperAgent {
+func (s *SuperAgent) SetBasicAuth(username string, password string) GoRequestAgent {
 	s.BasicAuth = struct{ Username, Password string }{username, password}
 	return s
 }
 
 // AddCookie adds a cookie to the request. The behavior is the same as AddCookie on Request from net/http
-func (s *SuperAgent) AddCookie(c *http.Cookie) *SuperAgent {
+func (s *SuperAgent) AddCookie(c *http.Cookie) GoRequestAgent {
 	s.Cookies = append(s.Cookies, c)
 	return s
 }
 
 // AddCookies is a convenient method to add multiple cookies
-func (s *SuperAgent) AddCookies(cookies []*http.Cookie) *SuperAgent {
+func (s *SuperAgent) AddCookies(cookies []*http.Cookie) GoRequestAgent {
 	s.Cookies = append(s.Cookies, cookies...)
 	return s
 }
@@ -477,7 +525,7 @@ var Types = map[string]string{
 //    "text/plain" uses "text"
 //    "application/x-www-form-urlencoded" uses "urlencoded", "form" or "form-data"
 //
-func (s *SuperAgent) Type(typeStr string) *SuperAgent {
+func (s *SuperAgent) Type(typeStr string) GoRequestAgent {
 	if _, ok := Types[typeStr]; ok {
 		s.ForceType = typeStr
 	} else {
@@ -519,7 +567,7 @@ func (s *SuperAgent) Type(typeStr string) *SuperAgent {
 //        Query(`{ size: '50x50', weight:'20kg' }`).
 //        End()
 //
-func (s *SuperAgent) Query(content interface{}) *SuperAgent {
+func (s *SuperAgent) Query(content interface{}) GoRequestAgent {
 	switch v := reflect.ValueOf(content); v.Kind() {
 	case reflect.String:
 		s.queryString(v.String())
@@ -532,7 +580,7 @@ func (s *SuperAgent) Query(content interface{}) *SuperAgent {
 	return s
 }
 
-func (s *SuperAgent) queryStruct(content interface{}) *SuperAgent {
+func (s *SuperAgent) queryStruct(content interface{}) GoRequestAgent {
 	if marshalContent, err := json.Marshal(content); err != nil {
 		s.Errors = append(s.Errors, err)
 	} else {
@@ -564,7 +612,7 @@ func (s *SuperAgent) queryStruct(content interface{}) *SuperAgent {
 	return s
 }
 
-func (s *SuperAgent) queryString(content string) *SuperAgent {
+func (s *SuperAgent) queryString(content string) GoRequestAgent {
 	var val map[string]string
 	if err := json.Unmarshal([]byte(content), &val); err == nil {
 		for k, v := range val {
@@ -585,14 +633,14 @@ func (s *SuperAgent) queryString(content string) *SuperAgent {
 	return s
 }
 
-func (s *SuperAgent) queryMap(content interface{}) *SuperAgent {
+func (s *SuperAgent) queryMap(content interface{}) GoRequestAgent {
 	return s.queryStruct(content)
 }
 
 // As Go conventions accepts ; as a synonym for &. (https://github.com/golang/go/issues/2210)
 // Thus, Query won't accept ; in a querystring if we provide something like fields=f1;f2;f3
 // This Param is then created as an alternative method to solve this.
-func (s *SuperAgent) Param(key string, value string) *SuperAgent {
+func (s *SuperAgent) Param(key string, value string) GoRequestAgent {
 	s.QueryData.Add(key, value)
 	return s
 }
@@ -604,7 +652,7 @@ func (s *SuperAgent) Param(key string, value string) *SuperAgent {
 //        Get("https://disable-security-check.com").
 //        End()
 //
-func (s *SuperAgent) TLSClientConfig(config *tls.Config) *SuperAgent {
+func (s *SuperAgent) TLSClientConfig(config *tls.Config) GoRequestAgent {
 	s.safeModifyTransport()
 	s.Transport.TLSClientConfig = config
 	return s
@@ -626,7 +674,7 @@ func (s *SuperAgent) TLSClientConfig(config *tls.Config) *SuperAgent {
 //        Post("http://www.google.com").
 //        End()
 //
-func (s *SuperAgent) Proxy(proxyUrl string) *SuperAgent {
+func (s *SuperAgent) Proxy(proxyUrl string) GoRequestAgent {
 	parsedProxyUrl, err := url.Parse(proxyUrl)
 	if err != nil {
 		s.Errors = append(s.Errors, err)
@@ -646,7 +694,7 @@ func (s *SuperAgent) Proxy(proxyUrl string) *SuperAgent {
 //
 // The policy function's arguments are the Request about to be made and the
 // past requests in order of oldest first.
-func (s *SuperAgent) RedirectPolicy(policy func(req Request, via []Request) error) *SuperAgent {
+func (s *SuperAgent) RedirectPolicy(policy func(req Request, via []Request) error) GoRequestAgent {
 	s.safeModifyHttpClient()
 	s.Client.CheckRedirect = func(r *http.Request, v []*http.Request) error {
 		vv := make([]Request, len(v))
@@ -703,7 +751,7 @@ func (s *SuperAgent) RedirectPolicy(policy func(req Request, via []Request) erro
 //        Send("hello world").
 //        End()
 //
-func (s *SuperAgent) Send(content interface{}) *SuperAgent {
+func (s *SuperAgent) Send(content interface{}) GoRequestAgent {
 	// TODO: add normal text mode or other mode to Send func
 	switch v := reflect.ValueOf(content); v.Kind() {
 	case reflect.String:
@@ -752,18 +800,18 @@ func makeSliceOfReflectValue(v reflect.Value) (slice []interface{}) {
 
 // SendSlice (similar to SendString) returns SuperAgent's itself for any next chain and takes content []interface{} as a parameter.
 // Its duty is to append slice of interface{} into s.SliceData ([]interface{}) which later changes into json array in the End() func.
-func (s *SuperAgent) SendSlice(content []interface{}) *SuperAgent {
+func (s *SuperAgent) SendSlice(content []interface{}) GoRequestAgent {
 	s.SliceData = append(s.SliceData, content...)
 	return s
 }
 
-func (s *SuperAgent) SendMap(content interface{}) *SuperAgent {
+func (s *SuperAgent) SendMap(content interface{}) GoRequestAgent {
 	return s.SendStruct(content)
 }
 
 // SendStruct (similar to SendString) returns SuperAgent's itself for any next chain and takes content interface{} as a parameter.
 // Its duty is to transfrom interface{} (implicitly always a struct) into s.Data (map[string]interface{}) which later changes into appropriate format such as json, form, text, etc. in the End() func.
-func (s *SuperAgent) SendStruct(content interface{}) *SuperAgent {
+func (s *SuperAgent) SendStruct(content interface{}) GoRequestAgent {
 	if marshalContent, err := json.Marshal(content); err != nil {
 		s.Errors = append(s.Errors, err)
 	} else {
@@ -784,7 +832,7 @@ func (s *SuperAgent) SendStruct(content interface{}) *SuperAgent {
 // SendString returns SuperAgent's itself for any next chain and takes content string as a parameter.
 // Its duty is to transform String into s.Data (map[string]interface{}) which later changes into appropriate format such as json, form, text, etc. in the End func.
 // Send implicitly uses SendString and you should use Send instead of this.
-func (s *SuperAgent) SendString(content string) *SuperAgent {
+func (s *SuperAgent) SendString(content string) GoRequestAgent {
 	if !s.BounceToRawString {
 		var val interface{}
 		d := json.NewDecoder(strings.NewReader(content))
@@ -886,7 +934,7 @@ type File struct {
 //        SendFile(b, "", "my_custom_fieldname"). // filename left blank, will become "example_file.ext"
 //        End()
 //
-func (s *SuperAgent) SendFile(file interface{}, args ...string) *SuperAgent {
+func (s *SuperAgent) SendFile(file interface{}, args ...string) GoRequestAgent {
 
 	filename := ""
 	fieldname := "file"
