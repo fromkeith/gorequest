@@ -107,6 +107,7 @@ type GoRequestAgent interface {
 	AsCurlCommand() (string, error)
 	Timeout(timeout time.Duration) GoRequestAgent
 	GetClient() *http.Client
+	SetTransport(t *http.Transport) GoRequestAgent
 }
 
 // A SuperAgent is a object storing all request data for client.
@@ -1477,7 +1478,7 @@ func (s *SuperAgent) AsCurlCommand() (string, error) {
 }
 
 // set the transport in a chainable way
-func (s *SuperAgent) SetTransport(t *http.Transport) *SuperAgent {
+func (s *SuperAgent) SetTransport(t *http.Transport) GoRequestAgent {
 	s.Transport = t
 	return s
 }
