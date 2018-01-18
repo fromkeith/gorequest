@@ -23,7 +23,7 @@ func (s *SuperAgent) safeModifyHttpClient() {
 }
 
 
-func (s *SuperAgent) Timeout(timeout time.Duration) *SuperAgent {
+func (s *SuperAgent) Timeout(timeout time.Duration) GoRequestAgent {
     s.safeModifyHttpClient()
     s.Client.Timeout = timeout
     return s
